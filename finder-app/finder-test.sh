@@ -54,7 +54,7 @@ fi
 
 for i in $( seq 1 $NUMFILES)
 do
-	gcc -g -Wall -o writer writer.c
+	#gcc -g -Wall -o writer writer.c
 	./writer "$WRITEDIR/${username}$i.txt" "$WRITESTR"
 done
 
