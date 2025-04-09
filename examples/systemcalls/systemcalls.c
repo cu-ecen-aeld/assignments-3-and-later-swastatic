@@ -1,5 +1,4 @@
 #include "systemcalls.h"
-
 /**
  * @param cmd the command to execute with system()
  * @return true if the command in @param cmd was executed
@@ -16,8 +15,11 @@ bool do_system(const char *cmd)
  *   and return a boolean true if the system() call completed with success
  *   or false() if it returned a failure
 */
-
-    return true;
+    int ret = system(cmd);
+    if(ret != 0)
+	    return false;
+    else
+	    return true;
 }
 
 /**
@@ -59,6 +61,34 @@ bool do_exec(int count, ...)
  *
 */
 
+    if(command[0][0] != '/')
+    	return false;
+
+    if(strstr(command[0], "test") != NULL)
+    {
+        if(strstr(command[1], "-f") != NULL)
+	{
+	    if(command[2][0] != '/')
+		return false;
+	}
+    }
+    
+    int status;
+    pid_t chipid = fork();
+    if(chipid < 0)
+	    return false;
+    if(chipid == 0)
+    {
+	    int ret;
+	    ret = execv(command[0], &command[1]);
+	    if(ret == -1)
+	    	return false;
+    }
+    if(waitpid(chipid, &status, 0) == -1)
+	    return false;
+    else if(WIFEXITED(status))
+	    return true;
+
     va_end(args);
 
     return true;
@@ -92,6 +122,34 @@ bool do_exec_redirect(const char *outputfile, int count, ...)
  *   The rest of the behaviour is same as do_exec()
  *
 */
+
+    int fd = open(outputfile, O_RDWR | O_CREAT, 0644);
+    if(fd < 0)
+    {
+	    perror("open");
+	    return false;
+    }
+    
+    int status;
+    pid_t chipid = fork();
+    if(chipid < 0)
+	    return false;
+    if(chipid == 0)
+    {
+	    int ret;
+	    if(dup2(fd, 1) < 0)
+	    {
+		perror("dup2");
+		return false;
+	    }
+	    ret = execv(command[0], &command[0]);
+	    if(ret == -1)
+	    	return false;
+    }
+    if(waitpid(chipid, &status, 0) == -1)
+	    return false;
+    else if(WIFEXITED(status))
+	    return true;
 
     va_end(args);
 
