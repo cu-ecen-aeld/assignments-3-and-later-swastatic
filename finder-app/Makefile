@@ -1,6 +1,7 @@
+CC=$(CROSS_COMPILE)gcc
 all: clean
-	${CROSS_COMPILE}gcc -g -Wall -c -o writer.o writer.c
-	${CROSS_COMPILE}gcc -g -Wall -I/ -o writer writer.o
+	${CC} -g -Wall -c -o writer.o writer.c
+	${CC} -g -Wall -I/ -o writer writer.o
 
 clean:
 	rm -rf writer.o writer
