@@ -1,4 +1,4 @@
-CC=gcc
+CC=$(CROSS_COMPILE)gcc
 all: clean
 	${CC} -g -Wall -pthread -c -o aesdsocket.o aesdsocket.c
 	${CC} -g -Wall -I/ -pthread -o aesdsocket aesdsocket.o
