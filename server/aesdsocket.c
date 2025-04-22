@@ -43,17 +43,9 @@ void* threadfunc(void* thread_param)
 	//thread_func_args->buff = (char *)malloc(64);
 	struct sockaddr_in their_addr;
 
-	//Listening and Accepting the connections
-	if (listen(thread_func_args->sockfd, 1) == -1) {
-		perror("listen");
-		close(thread_func_args->sockfd);
-		pthread_exit(NULL);
-	}
-	printf("Listening for connections...\n");
-	socklen_t addrlen = sizeof(their_addr);
-
 	while(1)
 	{
+		socklen_t addrlen = sizeof(struct sockaddr_in);
 		//Accept connections
 		int new_fd = accept(thread_func_args->sockfd, (struct sockaddr *)&their_addr, &addrlen);
 		if (new_fd == -1) {
@@ -71,7 +63,8 @@ void* threadfunc(void* thread_param)
 		//Open the file and write buff value into it
 		int buff_fd = open("/var/tmp/aesdsocketdata", O_RDWR|O_CREAT|O_APPEND, S_IRWXU|S_IRWXG|S_IRWXO);
 
-		int rd = recv(new_fd, thread_func_args->buff, sizeof(thread_func_args->buff), 0);
+		int rd = recv(new_fd, thread_func_args->buff, sizeof(thread_func_args->buff)-1, 0);
+		thread_func_args->buff[rd] = '\0';
 		while(rd > 0)
 		{
 			//Receiving data from the socket
@@ -85,16 +78,19 @@ void* threadfunc(void* thread_param)
 			if (newline)
 				break;
 			memset(thread_func_args->buff, 0, sizeof(thread_func_args->buff));
-			rd = recv(new_fd, thread_func_args->buff, sizeof(thread_func_args->buff), 0);
+			rd = recv(new_fd, thread_func_args->buff, sizeof(thread_func_args->buff)-1, 0);
+			thread_func_args->buff[rd] = '\0';
 		}
 
 		lseek(buff_fd, 0, SEEK_SET);
-		ssize_t sent = read(buff_fd, thread_func_args->buff, sizeof(thread_func_args->buff));
+		ssize_t sent = read(buff_fd, thread_func_args->buff, sizeof(thread_func_args->buff)-1);
+		thread_func_args->buff[sent] = '\0';
 		while(sent > 0)
 		{
 			send(new_fd, thread_func_args->buff, strlen(thread_func_args->buff), 0);
 			memset(thread_func_args->buff, 0, sizeof(thread_func_args->buff));
 			sent = read(buff_fd, thread_func_args->buff, sizeof(thread_func_args->buff));
+			thread_func_args->buff[sent] = '\0';
 		}
 		//printf("Closed connection from %s\n", client_ip);
 		syslog(LOG_INFO, "Closed connection from %s\n", client_ip);
@@ -148,6 +144,14 @@ int main(int argc, char **argv)
 	pid_t chipid = fork();
 	if(chipid == 0)
 	{
+		//Listening and Accepting the connections
+		if (listen(params.sockfd, 1) == -1) {
+			perror("listen");
+			close(params.sockfd);
+			pthread_exit(NULL);
+		}
+		printf("Listening for connections...\n");
+
 		//Setting up the pthread for the while loop to read and send the content
 		pthread_t thread;
 		int rc = pthread_create(&thread, NULL, threadfunc, &params);
