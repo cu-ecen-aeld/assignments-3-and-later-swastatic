@@ -1,8 +1,11 @@
-CC=$(CROSS_COMPILE)gcc
+CC ?= $(CROSS_COMPILE)gcc
+LDFLAGS ?= -pthread
+CFLAGS ?= -g -Wall
+TARGET ?= aesdsocket
 all: clean
-	${CC} -g -Wall -pthread -c -o aesdsocket.o aesdsocket.c
-	${CC} -g -Wall -I/ -pthread -o aesdsocket aesdsocket.o
+	${CC} ${CFLAGS} ${LDFLAGS} -c -o ${TARGET}.o ${TARGET}.c
+	${CC} ${CFLAGS} -I/ ${LDFLAGS} -o ${TARGET} ${TARGET}.o
 
 clean:
-	rm -rf aesdsocket.o aesdsocket
+	rm -rf ${TARGET}.o ${TARGET}
 

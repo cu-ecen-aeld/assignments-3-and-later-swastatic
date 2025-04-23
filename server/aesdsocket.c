@@ -53,9 +53,9 @@ struct node * create_node()
 pthread_mutex_t mutex;
 void* threadfunc(void* thread_param)
 {
+	pthread_mutex_lock(&mutex);
 	struct thread_data* thread_func_args = (struct thread_data *) thread_param;
 
-	pthread_mutex_lock(&mutex);
 	//Open the file and write buff value into it
 	int buff_fd = open("/var/tmp/aesdsocketdata", O_RDWR|O_CREAT|O_APPEND, S_IRWXU|S_IRWXG|S_IRWXO);
 
@@ -246,6 +246,8 @@ int main(int argc, char **argv)
 				printf("Creation of pthread failed!\n");
 				struct node *temp = head;
 				while (temp != NULL) {
+					close(temp->data.sockfd);
+					close(temp->data.new_fd);
 					pthread_join(temp->data.thread, NULL);
 					struct node *to_free = temp;
 					temp = temp->next;
@@ -261,12 +263,13 @@ int main(int argc, char **argv)
 			printf("\nCaught SIGTERM!\n");
 
 		syslog(LOG_INFO, "Caught signal, exiting\n");
-		close(params.sockfd);
 		pthread_mutex_destroy(&mutex);
 		system("rm -rf /var/tmp/aesdsocketdata");
 		//pthread_join(timethread, NULL);
 		struct node *temp = head;
 		while (temp != NULL) {
+			close(temp->data.sockfd);
+			close(temp->data.new_fd);
 			pthread_join(temp->data.thread, NULL);
 			struct node *to_free = temp;
 			temp = temp->next;
