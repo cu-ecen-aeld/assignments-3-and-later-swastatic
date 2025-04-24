@@ -1,5 +1,5 @@
 CC ?= $(CROSS_COMPILE)gcc
-LDFLAGS ?= -pthread
+LDFLAGS ?= -lpthread
 CFLAGS ?= -g -Wall
 TARGET ?= aesdsocket
 all: clean
