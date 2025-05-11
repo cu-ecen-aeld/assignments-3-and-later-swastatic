@@ -57,7 +57,11 @@ void* threadfunc(void* thread_param)
 	struct thread_data* thread_func_args = (struct thread_data *) thread_param;
 
 	//Open the file and write buff value into it
+#ifdef USE_AESD_CHAR_DEVICE
+	int buff_fd = open("/var/tmp/aesdchar", O_RDWR|O_CREAT|O_APPEND, S_IRWXU|S_IRWXG|S_IRWXO);
+#else
 	int buff_fd = open("/var/tmp/aesdsocketdata", O_RDWR|O_CREAT|O_APPEND, S_IRWXU|S_IRWXG|S_IRWXO);
+#endif
 
 	int rd = recv(thread_func_args->new_fd, thread_func_args->buff, sizeof(thread_func_args->buff)-1, 0);
 	thread_func_args->buff[rd] = '\0';
@@ -97,6 +101,7 @@ void* threadfunc(void* thread_param)
 	return NULL;
 }
 
+#ifndef USE_AESD_CHAR_DEVICE
 void* time_writer(void* thread_param)
 {
 	char timestr[200];
@@ -128,6 +133,7 @@ void* time_writer(void* thread_param)
 	}
 	return NULL;
 }
+#endif
 
 int main(int argc, char **argv)
 {
@@ -186,16 +192,21 @@ int main(int argc, char **argv)
         		exit(EXIT_FAILURE);
 		}
 
+#ifndef USE_AESD_CHAR_DEVICE
 		pthread_t timethread;
+#endif
 		struct node * head = NULL;
 		struct node * last = NULL;
+		int rc;
 
-		int rc = pthread_create(&timethread, NULL, time_writer, NULL);
+#ifndef USE_AESD_CHAR_DEVICE
+		rc = pthread_create(&timethread, NULL, time_writer, NULL);
 		if (rc != 0)
 		{
 			printf("Creation of pthread failed!\n");
 			return false;
 		}
+#endif
 
 		//Setting up the signals
 		struct sigaction new_action;
@@ -264,7 +275,11 @@ int main(int argc, char **argv)
 
 		syslog(LOG_INFO, "Caught signal, exiting\n");
 		pthread_mutex_destroy(&mutex);
+#ifdef USE_AESD_CHAR_DEVICE
+		system("rm -rf /var/tmp/aesdchar");
+#else
 		system("rm -rf /var/tmp/aesdsocketdata");
+#endif
 		//pthread_join(timethread, NULL);
 		struct node *temp = head;
 		while (temp != NULL) {
