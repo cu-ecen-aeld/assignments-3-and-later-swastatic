@@ -16,6 +16,8 @@
 #include <string.h>
 #include <syslog.h>
 
+#define USE_AESD_CHAR_DEVICE 1
+
 bool caught_sigint = false;
 bool caught_sigterm = false;
 
