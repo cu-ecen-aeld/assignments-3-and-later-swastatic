@@ -13,7 +13,7 @@ fi
 
 if [ -e ${module}.ko ]; then
     echo "Loading local built file ${module}.ko"
-    insmod ./$module.ko $* || exit 1
+    insmod /lib/modules/6.1.44/extra/$module.ko $* || exit 1
 else
     echo "Local file ${module}.ko not found, attempting to modprobe"
     modprobe ${module} || exit 1
