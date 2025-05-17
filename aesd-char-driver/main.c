@@ -20,6 +20,7 @@
 #include <linux/slab.h>
 #include "aesd-circular-buffer.h"
 #include "aesdchar.h"
+#include "aesd_ioctl.h"
 int aesd_major =   0; // use dynamic major
 int aesd_minor =   0;
 
@@ -149,12 +150,106 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
     retval = count;
     return retval;
 }
+
+long int aesd_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+{
+    struct aesd_seekto seek_params;
+    struct aesd_dev *dev = file->private_data;
+    int retval = 0;
+
+    switch (cmd) {
+        case AESDCHAR_IOCSEEKTO:
+            // Copy the seek parameters from user space into the struct
+            if (copy_from_user(&seek_params, (struct aesd_seekto *)arg, sizeof(seek_params))) {
+                return -EFAULT;
+            }
+
+            // Validate the write_cmd index
+            if (seek_params.write_cmd >= AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED ||
+                !dev->buffer.entry[seek_params.write_cmd].buffptr) {
+                return -EINVAL;  // Invalid write_cmd index
+            }
+
+            // Validate the offset within the specific write command
+            if (seek_params.write_cmd_offset >= dev->buffer.entry[seek_params.write_cmd].size) {
+                return -EINVAL;  // Invalid offset within the write command
+            }
+
+            // Update the file pointer (f_pos) to the new position
+            file->f_pos = seek_params.write_cmd_offset;
+
+            printk(KERN_INFO "Seek to write command %d, offset %d\n",
+                   seek_params.write_cmd, seek_params.write_cmd_offset);
+            break;
+
+        default:
+            return -ENOTTY;  // Command not recognized
+    }
+
+    return retval;
+}
+
+size_t aesd_circular_buffer_total_size(struct aesd_circular_buffer *cb)
+{
+    size_t total_size = 0;
+    unsigned int i;
+
+    // Sum the size of each valid entry in the buffer
+    for (i = 0; i < AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED; i++) {
+        if (cb->entry[i].buffptr != NULL) {
+            total_size += cb->entry[i].size;
+        }
+    }
+
+    return total_size;
+}
+
+loff_t aesd_llseek(struct file *file, loff_t offset, int whence)
+{
+    struct aesd_dev *dev = file->private_data;
+    size_t total_size = aesd_circular_buffer_total_size(&dev->buffer); // Get total size of the buffer
+    loff_t new_pos;
+
+    switch (whence) {
+        case SEEK_SET:
+            // Move to the absolute offset
+            new_pos = offset;
+            break;
+        case SEEK_CUR:
+            // Move relative to the current file position
+            new_pos = file->f_pos + offset;
+            break;
+        case SEEK_END:
+            // Move relative to the end of the file
+            new_pos = total_size + offset;
+            break;
+        default:
+            return -EINVAL; // Invalid whence value
+    }
+
+    // Ensure that the new position is within valid bounds
+    if (new_pos < 0) {
+        return -EINVAL; // Invalid position
+    }
+
+    // Prevent going beyond the end of the buffer
+    if (new_pos > total_size) {
+        new_pos = total_size;
+    }
+
+    // Update the file position
+    file->f_pos = new_pos;
+    return new_pos;
+}
+
 struct file_operations aesd_fops = {
     .owner =    THIS_MODULE,
     .read =     aesd_read,
     .write =    aesd_write,
     .open =     aesd_open,
     .release =  aesd_release,
+    .unlocked_ioctl = aesd_ioctl,
+    .llseek =   aesd_llseek,
 };
 
 static int aesd_setup_cdev(struct aesd_dev *dev)
