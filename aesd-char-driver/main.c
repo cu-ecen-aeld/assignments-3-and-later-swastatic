@@ -156,6 +156,8 @@ long int aesd_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
     struct aesd_seekto seek_params;
     struct aesd_dev *dev = file->private_data;
     int retval = 0;
+    unsigned int i;
+    loff_t new_pos;
 
     switch (cmd) {
         case AESDCHAR_IOCSEEKTO:
@@ -176,7 +178,15 @@ long int aesd_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
             }
 
             // Update the file pointer (f_pos) to the new position
-            file->f_pos = seek_params.write_cmd_offset;
+	    new_pos = 0;
+
+	    for (i = 0; i < seek_params.write_cmd; i++) {
+		    new_pos += dev->buffer.entry[i].size;
+	    }
+
+	    new_pos += seek_params.write_cmd_offset;
+
+	    file->f_pos = new_pos;
 
             printk(KERN_INFO "Seek to write command %d, offset %d\n",
                    seek_params.write_cmd, seek_params.write_cmd_offset);

@@ -15,6 +15,7 @@
 #include <stdbool.h>
 #include <string.h>
 #include <syslog.h>
+#include "../aesd-char-driver/aesd_ioctl.h"
 
 #define USE_AESD_CHAR_DEVICE 1
 
@@ -60,7 +61,7 @@ void* threadfunc(void* thread_param)
 
 	//Open the file and write buff value into it
 #ifdef USE_AESD_CHAR_DEVICE
-	int buff_fd = open("/var/tmp/aesdchar", O_RDWR|O_CREAT|O_APPEND, S_IRWXU|S_IRWXG|S_IRWXO);
+	int buff_fd = open("/dev/aesdchar", O_RDWR);
 #else
 	int buff_fd = open("/var/tmp/aesdsocketdata", O_RDWR|O_CREAT|O_APPEND, S_IRWXU|S_IRWXG|S_IRWXO);
 #endif
@@ -76,7 +77,25 @@ void* threadfunc(void* thread_param)
 			thread_func_args->buff[index+1] = '\0';
 		}
 		unsigned char len = strlen(thread_func_args->buff);
+#ifdef USE_AESD_CHAR_DEVICE
+		if (strstr(thread_func_args->buff, "AESDCHAR_IOCSEEKTO"))
+		{
+			int write_cmd, write_cmd_offset;
+			sscanf(thread_func_args->buff, "AESDCHAR_IOCSEEKTO:%d,%d", &write_cmd, &write_cmd_offset);
+
+			struct aesd_seekto seekto;
+			seekto.write_cmd = write_cmd;
+			seekto.write_cmd_offset = write_cmd_offset;
+
+			if (ioctl(buff_fd, AESDCHAR_IOCSEEKTO, &seekto) == -1) {
+				perror("ioctl failed");
+			}
+		}
+		else
+			write(buff_fd, thread_func_args->buff, len);
+#else
 		write(buff_fd, thread_func_args->buff, len);
+#endif
 		if (newline)
 			break;
 		memset(thread_func_args->buff, 0, sizeof(thread_func_args->buff));
@@ -84,7 +103,6 @@ void* threadfunc(void* thread_param)
 		thread_func_args->buff[rd] = '\0';
 	}
 
-	lseek(buff_fd, 0, SEEK_SET);
 	ssize_t sent = read(buff_fd, thread_func_args->buff, sizeof(thread_func_args->buff)-1);
 	thread_func_args->buff[sent] = '\0';
 	while(sent > 0)
